@@ -1,7 +1,23 @@
 import Head from 'next/head';
-import styles from './styles.module.scss';
+import { getPrismicClient } from '../../services/prismic';
+import Prismic from '@prismicio/client';
+import { GetStaticProps } from 'next';
+import { RichText } from 'prismic-dom';
 
-export default function Posts() {
+import styles from './styles.module.scss';
+import Link from 'next/link';
+
+type Post = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  updatedAt: string;
+}
+interface PostsProps {
+  posts: Post[]
+}
+
+export default function Posts({posts}: PostsProps) {
   return(
    <>
     <Head>
@@ -10,27 +26,48 @@ export default function Posts() {
 
     <main className={styles.container}>
       <div className={styles.posts}>
-        <a href="">
-          <time>Mapas com React usando Leaflet</time>
-          <strong>Introdução</strong>
-          <p>Leaflet é uma biblioteca JavaScript open-source para trabalhar com Mapas em aplicações web e mobile. Pode ser simplesmente integrada a um site usando apenas HTML, CSS e JavaScript.
-
-Podemos também integrar a Leaflet ao React com a biblioteca React Leaflet, que tem suporte ao TypeScript sendo bastante simples de utilizar. Ambas serão utilizadas em nossa aplicação de demonstração.
-
-Somando todas essas tecnologias e conceitos, no final deste post vamos ter desenvolvido o app Entregas. Vai ser assim</p>
-        </a>
-
-        <a href="">
-          <time>Mapas com React usando Leaflet</time>
-          <strong>Introdução</strong>
-          <p>Leaflet é uma biblioteca JavaScript open-source para trabalhar com Mapas em aplicações web e mobile. Pode ser simplesmente integrada a um site usando apenas HTML, CSS e JavaScript.
-
-Podemos também integrar a Leaflet ao React com a biblioteca React Leaflet, que tem suporte ao TypeScript sendo bastante simples de utilizar. Ambas serão utilizadas em nossa aplicação de demonstração.
-
-Somando todas essas tecnologias e conceitos, no final deste post vamos ter desenvolvido o app Entregas. Vai ser assim</p>
-        </a>
+        { posts.map(post => (
+          <Link href={`/posts/${post.slug}`}>
+            <a key={post.slug}>
+              <time>{post.updatedAt}</time>
+              <strong>{post.title}</strong>
+              <p>{post.excerpt}</p>
+            </a>
+          </Link>
+        ))}
+        
       </div>
     </main>
    </>
   );
+}
+
+export const getStaticProps: GetStaticProps = async () => {
+  const prismic = getPrismicClient()
+
+  const response = await prismic.query([
+    Prismic.predicates.at('document.type', 'publication')
+  ], {
+    fetch: ['publication.title', 'publication.content'],
+    pageSize: 100,
+  })
+
+  const posts = response.results.map(post => {
+    return {
+      slug: post.uid,
+      title: RichText.asText(post.data.title),
+      excerpt: post.data.content.find(content => content.type === 'paragraph')?.text ?? '',
+      updatedAt: new Date(post.last_publication_date).toLocaleDateString('PT-BR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      })
+    }
+  })
+
+  return {
+    props: {
+      posts
+    }
+  }
 }
